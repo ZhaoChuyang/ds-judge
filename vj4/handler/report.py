@@ -237,7 +237,12 @@ class ReportUploadHandler(base.Handler):
   @base.sanitize
   async def post(self, *, rid: str):
     data = await self.request.post()
+
     file = data['file']
+
+    if not hasattr(file, 'file'):
+      raise error.FileNotFoundError()
+
     file_data = file.file
     file_name = file.filename
     file_extension = file_name.split(".")[-1]
@@ -248,14 +253,21 @@ class ReportUploadHandler(base.Handler):
 
     check_file_type(file_extension)
     uid = self.user['_id']
-    upload_time = pytz.utc.localize(datetime.datetime.now()).astimezone(self.timezone)
+
+    shanghai = pytz.timezone('Asia/Shanghai')
+
+    upload_time = datetime.datetime.utcnow().astimezone(shanghai)
     student = mdb.user.find_one({"_id": uid})
     rid = objectid.ObjectId(rid)
     this_report = mdb.report.find_one({"_id": rid})
     report_id = this_report['_id']
 
-    report_deadline = pytz.utc.localize(this_report['end_at']).astimezone(self.timezone)
+
+    report_deadline = pytz.utc.localize(this_report['end_at']).astimezone(shanghai)
     if upload_time > report_deadline:
+
+      print(upload_time)
+      print(report_deadline)
       raise error.HomeworkNotLiveError()
 
     if report_rename(student, this_report, file_extension) is not None:

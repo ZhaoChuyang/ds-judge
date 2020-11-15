@@ -74,6 +74,11 @@ class BlacklistedError(ForbiddenError):
   def message(self):
     return 'Address {0} is blacklisted.'
 
+class FileNotFoundError(ValidationError):
+  @property
+  def message(self):
+    return '未选择文件.'
+
 
 class FileTooLongError(ValidationError):
   @property
