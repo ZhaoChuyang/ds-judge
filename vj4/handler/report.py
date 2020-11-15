@@ -261,8 +261,6 @@ class ReportUploadHandler(base.Handler):
     if report_rename(student, this_report, file_extension) is not None:
       file_name = report_rename(student, this_report, file_extension)
 
-    with open('data/%s' % file_name, 'wb') as f:
-      f.write(file_data.read())
 
     ureport = mdb.ureport.find_one({'user_id': uid, 'report_id': report_id})
     pdoc = None
@@ -279,7 +277,8 @@ class ReportUploadHandler(base.Handler):
         'report_id': report_id,
         'data': file_name,
         'upload_time': upload_time})
-
+    with open('data/%s' % file_name, 'wb') as f:
+      f.write(file_data.read())
 
     # if report.report_rename(student, report) is not None:
     #   file_name = report.report_rename(student, report)
@@ -435,11 +434,13 @@ class ReportCodeHandler(contest.ContestMixin, base.Handler):
 
     user_filters = {}
     if year != "All":
-      user_filters["year"] = year
+      user_filters["year"] = int(year)
     if _class != "All":
       user_filters["_class"] = _class
     if group != "All":
       user_filters["group"] = group
+    if uid != "All":
+      user_filters["_id"] = int(uid)
     all_users = mdb.user.find(user_filters)
     all_user_ids = [tuser["_id"] for tuser in all_users]
 
