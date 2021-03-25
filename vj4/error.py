@@ -74,10 +74,11 @@ class BlacklistedError(ForbiddenError):
   def message(self):
     return 'Address {0} is blacklisted.'
 
+
 class FileNotFoundError(ValidationError):
   @property
   def message(self):
-    return '未选择文件.'
+    return '未选择报告文件或代码.'
 
 
 class FileTooLongError(ValidationError):
@@ -90,6 +91,18 @@ class FileTypeNotAllowedError(ValidationError):
   @property
   def message(self):
     return 'This type of files are not allowed to be uploaded.'
+
+
+class ReportFileTypeNotAllowedError(ValidationError):
+  @property
+  def message(self):
+    return '报告文件只能为 "pdf", "doc", "docx" 格式中的一种，请检查文件格式重新上传.'
+
+
+class CodeFileTypeNotAllowedError(ValidationError):
+  @property
+  def message(self):
+    return '代码文件只能为 "zip" 格式，请检查文件格式重新上传.'
 
 
 class UnknownFieldError(ForbiddenError):

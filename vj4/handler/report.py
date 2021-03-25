@@ -25,7 +25,7 @@ from vj4.util import pagination
 from aiohttp import web
 from vj4.db import mdb
 from vj4.model import fs
-from vj4.model.report import report_rename
+from vj4.model.report import file_rename
 from vj4.model.adaptor.setting import Setting
 
 
@@ -223,9 +223,24 @@ class ReportDownloadHandler(contest.ContestMixin, base.Handler):
   async def post(self, rid: objectid.ObjectId):
     user_id = self.user['_id']
     ureport = mdb.ureport.find_one({'user_id': user_id, 'report_id': rid})
-    file_name = ureport['data']
-    with open('data/%s' % file_name, 'rb') as fb:
-      await self.binary(fb.read(), file_name=file_name)
+    output_buffer = io.BytesIO()
+    zip_file = zipfile.ZipFile(output_buffer, 'a', zipfile.ZIP_DEFLATED)
+
+    report_name = ureport['report_data']
+    if report_name != None:
+      with open("data/%s" % report_name, "rb") as f:
+        zip_file.writestr(report_name, f.read())
+    code_name = ureport['code_data']
+    if code_name != None:
+      with open("data/%s" % code_name, "rb") as f:
+        zip_file.writestr(code_name, f.read())
+
+    for zfile in zip_file.filelist:
+      zfile.create_system = 0
+    zip_file.close()
+
+    await self.binary(output_buffer.getvalue(), 'application/zip',
+                      file_name='Archive.zip')
 
 
 @app.route('/report/{rid}/upload', 'report_upload')
@@ -238,20 +253,39 @@ class ReportUploadHandler(base.Handler):
   async def post(self, *, rid: str):
     data = await self.request.post()
 
-    file = data['file']
-
-    if not hasattr(file, 'file'):
+    report = data['report']
+    code = data['code']
+    # 既没有报告，也没有代码
+    if not (hasattr(report, 'file') or hasattr(code, 'file')):
       raise error.FileNotFoundError()
 
-    file_data = file.file
-    file_name = file.filename
-    file_extension = file_name.split(".")[-1]
+    has_report = False
+    has_code = False
 
-    def check_file_type(extension):
-      if extension not in ['pdf', 'doc', 'docx']:
-        raise error.FileTypeNotAllowedError(extension)
+    if hasattr(report, 'file'):
+      has_report = True
+    if hasattr(code, 'file'):
+      has_code = True
 
-    check_file_type(file_extension)
+    if has_report:
+      report_data = report.file
+      report_name = report.filename
+      report_extension = report_name.split(".")[-1]
+    if has_code:
+      code_data = code.file
+      code_name = code.filename
+      code_extension = code_name.split('.')[-1]
+
+    # def check_file_type(extension):
+    #   if extension not in ['pdf', 'doc', 'docx']:
+    #     raise error.FileTypeNotAllowedError(extension)
+    if has_report:
+      if report_extension not in ['pdf', 'doc', 'docx']:
+        raise error.ReportFileTypeNotAllowedError(report_extension)
+    if has_code:
+      if code_extension not in ['zip']:
+        raise error.CodeFileTypeNotAllowedError(code_extension)
+
     uid = self.user['_id']
 
     shanghai = pytz.timezone('Asia/Shanghai')
@@ -262,36 +296,60 @@ class ReportUploadHandler(base.Handler):
     this_report = mdb.report.find_one({"_id": rid})
     report_id = this_report['_id']
 
-
     report_deadline = pytz.utc.localize(this_report['end_at']).astimezone(shanghai)
-    if upload_time > report_deadline:
 
-      print(upload_time)
-      print(report_deadline)
+    print(upload_time)
+    print(report_deadline)
+
+    if upload_time > report_deadline:
       raise error.HomeworkNotLiveError()
 
-    if report_rename(student, this_report, file_extension) is not None:
-      file_name = report_rename(student, this_report, file_extension)
+    # 数据结构课设的 course_id 等于 3
+    if has_report:
+      if file_rename(3, 'report', student, this_report, report_extension) is not None:
+        report_name = file_rename(3, 'report', student, this_report, report_extension)
+    if has_code:
+      if file_rename(3, 'code', student, this_report, code_extension) is not None:
+        code_name = file_rename(3, 'code', student, this_report, code_extension)
 
 
     ureport = mdb.ureport.find_one({'user_id': uid, 'report_id': report_id})
     pdoc = None
     if ureport:
-      try:
-        os.unlink('data/%s' % ureport['data'])
-      except FileNotFoundError as e:
-        pass
-      pdoc = mdb.ureport.update_one({'user_id': uid, 'report_id': report_id}, {"$set": {"data": file_name, "upload_time": upload_time}})
+      # update report or code
+      if has_report:
+        try:
+          os.unlink('data/%s' % ureport['report_data'])
+        except FileNotFoundError as e:
+          pass
+        pdoc = mdb.ureport.update_one({'user_id': uid, 'report_id': report_id}, {"$set": {"report_data": report_name, "upload_time": upload_time}})
+      if has_code:
+        try:
+          os.unlink('data/%s' % ureport['code_data'])
+        except FileNotFoundError as e:
+          pass
+        pdoc = mdb.ureport.update_one({'user_id': uid, 'report_id': report_id},
+                                      {"$set": {"code_data": code_name, "upload_time": upload_time}})
     else:
+      # create new report or code
+      if not has_report:
+        report_name = None
+      if not has_code:
+        code_name = None
       pdoc = mdb.ureport.insert_one({
         '_id': objectid.ObjectId(),
         'user_id': uid,
         'report_id': report_id,
-        'data': file_name,
+        'report_data': report_name,
+        'code_data': code_name,
         'upload_time': upload_time})
-    with open('data/%s' % file_name, 'wb') as f:
-      f.write(file_data.read())
 
+    if has_report:
+      with open('data/%s' % report_name, 'wb') as f:
+        f.write(report_data.read())
+    if has_code:
+      with open('data/%s' % code_name, 'wb') as f:
+        f.write(code_data.read())
     # if report.report_rename(student, report) is not None:
     #   file_name = report.report_rename(student, report)
     # ureport = mdb.find_one({'user_id': uid, 'report_id': report_id})
@@ -461,10 +519,14 @@ class ReportCodeHandler(contest.ContestMixin, base.Handler):
     output_buffer = io.BytesIO()
     zip_file = zipfile.ZipFile(output_buffer, 'a', zipfile.ZIP_DEFLATED)
     for report in all_reports:
-      file_name = report['data']
-      with open("data/%s" % file_name, "rb") as f:
-        zip_file.writestr(file_name, f.read())
-
+      report_name = report['report_data']
+      code_name = report['code_data']
+      if report_name != None:
+        with open("data/%s" % report_name, "rb") as f:
+          zip_file.writestr(report_name, f.read())
+      if code_name != None:
+        with open("data/%s" % code_name, "rb") as f:
+          zip_file.writestr(code_name, f.read())
     for zfile in zip_file.filelist:
       zfile.create_system = 0
     zip_file.close()

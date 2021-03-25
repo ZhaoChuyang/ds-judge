@@ -18,6 +18,27 @@
                 </div>
                 {% if handler.is_not_started(tdoc) %}
                     {{ nothing.render('This homework is not open and you cannot view problems.') }}
+                {% elif handler.is_done(tdoc) %}
+                    {% if handler.user['_id'] != 1 %}
+                        <div class="section__body">
+                            <p>{{ _('Current report: {0}').format(pdoc['report_data']|default(_('(None)'))) }}</p>
+                            <p style="margin-bottom: 10px">{{ _('Current code: {0}').format(pdoc['code_data']|default(_('(None)'))) }}</p>
+                            <p>   </p>
+                            {% if pdoc %}
+                                <form  action="{{ reverse_url('report_download', rid=tdoc['_id']) }}" method="post">
+                                    <input type="hidden" name="csrf_token" value="{{ handler.csrf_token }}">
+                                    <button type="submit" name="download_report" value="your_value"
+                                            class="expanded button">{{ _('Download Your Report and Code') }}</button>
+                                </form>
+                                {#                            <p><a href="{{ reverse_url('download_report') }}" class="expanded button">{{ _('Download Your Report') }}</a></p>#}
+                            {% else %}
+                                <p>{{ "You have not uploaded any report or code."  }}</p>
+                            {% endif %}
+
+                        </div>
+                    {% else %}
+                        {{ nothing.render('This homework is done.') }}
+                    {% endif %}
                 {% elif handler.user['_id'] == 1 %}
                     {{ nothing.render('Please login to see details.') }}
                 {% else %}
@@ -25,13 +46,19 @@
                         <div class="section__body">
                             <form method="post" action="/report/{{ tdoc['_id'] }}/upload" target="_self"
                                   enctype="multipart/form-data">
-                                <p>{{ _('Current report: {0}').format(pdoc['data']|default(_('(None)'))) }}</p>
-                                <p>
-                                    {{ _('Update report') }}:
+                                <p>{{ _('Current report: {0}').format(pdoc['report_data']|default(_('(None)'))) }}</p>
+                                <p>{{ _('Current code: {0}').format(pdoc['code_data']|default(_('(None)'))) }}</p>
+                                <p style="margin-top: 5px;">
+                                    {{ _('Upload report') }}:
                                     <input type="hidden" name="csrf_token" value="{{ handler.csrf_token }}">
-                                    <input type="file" name="file">
+                                    <input type="file" name="report">
+                                </p>
+                                <p style="margin-top: 1px;">
+                                    {{ _('Upload code') }}:
+                                    <input type="file" name="code">
                                     <input type="submit" value="{{ _('Upload') }}" class="rounded primary button">
                                 </p>
+
                             </form>
                             <p class="help-text">{{ _('report template') }}:
                                 <a href="https://github.com/ZhaoChuyang/ds-judge/blob/master/resource/ds_template.docx?raw=true">{{ _('Download') }}</a>

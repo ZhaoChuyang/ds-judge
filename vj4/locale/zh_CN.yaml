@@ -798,9 +798,10 @@ Instead of copying the test data directly, the test data of the copied problems 
 This message will be presented to those whose submissions are accepted.: 这条消息将会被展示给通过此题的用户。
 Sorry, there is no user in this domain.: 此域中目前没有用户。
 Reports: 实验报告
-Upload Report: 上传报告
 'Current report: {0}': '当前实验报告: {0}'
-Update report: 上传实验报告
+'Current code: {0}': '当前实验代码: {0}'
+Upload report: 上传实验报告
+Upload code: 上传实验代码
 Report create: 创建实验报告
 Report_id: 实验序号
 report_id: 实验序号
